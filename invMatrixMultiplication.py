@@ -12,10 +12,6 @@ import matplotlib.pyplot as plt
 from pylsl import StreamInlet, resolve_stream, resolve_byprop
 
 
-
-
-
-
 invMat = scipy.io.loadmat('/home/neuropsynov/hugHackathon/MNI_actiCHamp64.mat')
 
 
@@ -36,16 +32,22 @@ paramFil = scipy.signal.butter(6, [low, high], btype='band')
 currentIndex=0
 buffSize=500
 buff = np.zeros([buffSize, streams[0].channel_count()])
+updateDisplay=0.05 #50ms
+nbSampleUpdateDisplay=updateDisplay*streams[0].nominal_srate()
+convMatrix=np.ones([nbSampleUpdateDisplay,streams[0].channel_count()])/nbSampleUpdateDisplay
 
 while True:
     # get a new sample (you can also omit the timestamp part if you're not
     # interested in it)
     #sample, timestamp = inlet.pull_sample()
     np.roll(buff, -1, 0)
-    buff[buffSize - 1, :] = inlet.pull_sample()
-   # pdb.set_trace()
+    buff[buffSize - 1, :], timestamp = inlet.pull_sample()
+    #pdb.set_trace()
     filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],buff,method="gust",axis=0)
+    
+    #
     #scipy.signal.filtfilt()
+    moySample=scipy.signal.fftconvolve(filtSample,convMatrix,"same")
     invsolmat = np.sqrt(np.multiply(np.dot(invMat["x"],filtSample),np.dot(invMat["x"],filtSample)) + np.multiply(np.dot(invMat["y"],filtSample),np.dot(invMat["y"],filtSample)) + np.multiply(np.dot(invMat["z"],filtSample),np.dot(invMat["z"],filtSample)))
     currentIndex += 1
     if currentIndex % 500 == 0:
