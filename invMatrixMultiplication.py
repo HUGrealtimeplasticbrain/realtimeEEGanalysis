@@ -45,10 +45,8 @@ while True:
     #pdb.set_trace()
     filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],buff,method="gust",axis=0)
     
-    f_welch, S_xx_welch=scipy.signal.welch(filtSample,streams[0].nominal_srate(),axis=0)
-    df_welch = f_welch[1] - f_welch[0]
-    P_welch = np.sum(S_xx_welch) * df_welch
-    pdb.set_trace()
+    f_welch, S_xx_welch=scipy.signal.welch(filtSample,streams[0].nominal_srate(),nperseg=streams[0].nominal_srate()/10.0,axis=0,scaling="density")
+    
     #scipy.signal.filtfilt()
     moySample=scipy.signal.fftconvolve(filtSample,convMatrix,"same")
     invsolmat = np.sqrt(np.multiply(np.dot(invMat["x"],filtSample),np.dot(invMat["x"],filtSample)) + np.multiply(np.dot(invMat["y"],filtSample),np.dot(invMat["y"],filtSample)) + np.multiply(np.dot(invMat["z"],filtSample),np.dot(invMat["z"],filtSample)))
