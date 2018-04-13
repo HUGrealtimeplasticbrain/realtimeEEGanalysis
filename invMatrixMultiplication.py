@@ -35,16 +35,21 @@ paramFil = scipy.signal.butter(6, [low, high], btype='band')
 
 currentIndex=0
 buffSize=500
-preallocMat = np.zeros([streams[0].channel_count(),buffSize])
+buff = np.zeros([buffSize, streams[0].channel_count()])
 
 while True:
     # get a new sample (you can also omit the timestamp part if you're not
     # interested in it)
-    sample, timestamp = inlet.pull_sample()
-    
-    pdb.set_trace()
-    filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],sample,method="gust",axis=-1)
+    #sample, timestamp = inlet.pull_sample()
+    np.roll(buff, -1, 0)
+    buff[buffSize - 1, :] = inlet.pull_sample()
+   # pdb.set_trace()
+    filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],buff,method="gust",axis=0)
     #scipy.signal.filtfilt()
     invsolmat = np.sqrt(np.multiply(np.dot(invMat["x"],filtSample),np.dot(invMat["x"],filtSample)) + np.multiply(np.dot(invMat["y"],filtSample),np.dot(invMat["y"],filtSample)) + np.multiply(np.dot(invMat["z"],filtSample),np.dot(invMat["z"],filtSample)))
-    
-    
+    currentIndex += 1
+    if currentIndex % 500 == 0:
+       plt.plot(filtSample[:,5], 'b-')
+       plt.plot(buff[:,5], 'r-')
+       plt.show()
+
