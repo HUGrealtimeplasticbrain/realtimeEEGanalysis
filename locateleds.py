@@ -4,23 +4,43 @@
 # (c) 2017 Manik Bhattacharjee
 #
 
-from PyQt4.QtWidgets import QDialog, QApplication, QFileDialog, QMessageBox
-from PyQt4 import uic, QtCore
+
 import plasticbrain
+import sys
+from soma import aims
+from brainvisa import axon
+
+from brainvisa.configuration import neuroConfig
+neuroConfig.gui = True
 from brainvisa import anatomist
 import json, time
+import pdb
+import os
 
-class LocateLeds(QDialog):
-    def __init__(self):
-        QDialog.__init__(self)
+from soma.qt_gui.qt_backend import uic, QtGui, QtCore
+from soma.qt_gui.qt_backend.QtCore import QThread
+
+class LocateLeds(QtGui.QDialog):
+    def __init__(self, app = None):
+        QtGui.QDialog.__init__(self)
         self.ui = uic.loadUi("locateleds.ui", self)
         self.pb = plasticbrain.PlasticBrain()
-        self.ui.startButton.clicked.connect(self.start)
+        self.ui.startLocaButton.clicked.connect(self.start)
+        self.ui.loadMeshButton.clicked.connect(self.loadMesh)
+        self.ui.deviceCombo.currentIndexChanged.connect(self.updatedDeviceCombo)
+        self.ui.saveButton.clicked.connect(self.save)
+        self.ui.nextLedButton.clicked.connect(self.next)
+        self.ui.previousLedButton.clicked.connect(self.previous)
         self.a = anatomist.Anatomist('-b') #Batch mode (hide Anatomist window)
         self.a.onCursorNotifier.add(self.clickHandler)
+        
+
+        
         self.axWindow = self.a.createWindow( 'Axial' )
+        
+        layoutAx = QtGui.QHBoxLayout( self.frame )        
         self.axWindow.setParent(self.frame)
-        self.ui.frame.layout().addWidget( self.axWindow.getInternalRep() )
+        layoutAx.addWidget( self.axWindow.getInternalRep() )
         self.currentElec = 0
         self.coords = [[0,0,0],]
         
@@ -29,18 +49,26 @@ class LocateLeds(QDialog):
         if not path:
             return
         obj = self.a.loadObject(path)
+        pdb.set_trace()
         self.a.addObjects(obj, self.axWindow)
         
     def start(self):
         """Light up the first led"""
+        self.pb.open()
         self.pb.lightOne(0)
         self.currentElec = 0
         self.dispCoords(self.coords[self.currentElec])
+        
+    def updatedDeviceCombo(self):
+        print("no done yet")
     
     def next(self):
         self.currentElec = self.currentElec + 1
+        self.ui.currentLedLabel.setText("current LED : %i"%self.currentElec)
+        
         if self.currentElec >= len(self.coords):
             self.coords.append([0,0,0])
+            
         self.dispCoords(self.coords[self.currentElec])
         self.pb.lightOne(self.currentElec)
     
@@ -48,6 +76,7 @@ class LocateLeds(QDialog):
         if self.currentElec == 0:
             return
         self.currentElec = self.currentElec - 1
+        self.ui.currentLedLabel.setText("current LED : %i"%self.currentElec)
         self.dispCoords(self.coords[self.currentElec])
         self.pb.lightOne(self.currentElec)
     
@@ -87,5 +116,23 @@ class LocateLeds(QDialog):
         else:
             self.currentElec = 0
             self.coords = dic['leds']
-            
+     
+def main(noapp=0):
+     app = None
+     if noapp == 0:
+      print "NO APP"
+      app = QtGui.QApplication(sys.argv)
+      axon.initializeProcesses()
+      ll = LocateLeds(app=app)
+      ll.show()      
+     
+     if noapp == 0:
+      sys.exit(app.exec_())
+  
+
+if __name__ == "__main__":
+
+     QtCore.pyqtRemoveInputHook()
+     main()
+
             

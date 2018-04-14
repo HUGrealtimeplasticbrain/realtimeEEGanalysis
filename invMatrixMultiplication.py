@@ -7,6 +7,7 @@ import scipy.signal
 import numpy as np
 import pdb
 import matplotlib.pyplot as plt
+import math
 """Example program to show how to read a multi-channel time series from LSL."""
 
 from pylsl import StreamInlet, resolve_stream, resolve_byprop
@@ -45,10 +46,12 @@ while True:
     #pdb.set_trace()
     filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],buff,method="gust",axis=0)
     
-    f_welch, S_xx_welch=scipy.signal.welch(filtSample,streams[0].nominal_srate(),nperseg=streams[0].nominal_srate()/10.0,axis=0,scaling="density")
+    f_welch, S_xx_welch=scipy.signal.welch(filtSample[math.floor(buffSize/4):math.floor(buffSize/4)*3,:],streams[0].nominal_srate()/5,nperseg=streams[0].nominal_srate()/10.0,axis=0,scaling="density")
     
     #scipy.signal.filtfilt()
-    moySample=scipy.signal.fftconvolve(filtSample,convMatrix,"same")
+    #moySample=scipy.signal.fftconvolve(filtSample,convMatrix,"same")   
+    
+    pdb.set_trace()
     invsolmat = np.sqrt(np.multiply(np.dot(invMat["x"],filtSample),np.dot(invMat["x"],filtSample)) + np.multiply(np.dot(invMat["y"],filtSample),np.dot(invMat["y"],filtSample)) + np.multiply(np.dot(invMat["z"],filtSample),np.dot(invMat["z"],filtSample)))
     currentIndex += 1
     if currentIndex % 500 == 0:
