@@ -1,3 +1,5 @@
+import numpy as np
+
 def freqBandsPower(data, samplingRate = 500, eeg_bands = {'Delta': (0, 4), 'Theta': (4, 8), 'Alpha': (8, 12), 'Beta': (12, 30), 'Gamma': (30, 45)}):
     """ 
     Computes the power of the signal in the provided frequency bands
