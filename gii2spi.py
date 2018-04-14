@@ -1,3 +1,7 @@
+# 
+# Load a gifti mesh and convert it as a SPI file for Cartool
+#
+
 from soma import aims
 
 m = aims.read("/home/manik/full.gii")
