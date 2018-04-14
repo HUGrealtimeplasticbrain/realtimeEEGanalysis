@@ -4,9 +4,13 @@ import numpy as np
 
 def closest_node(node, nodes):
     closest_index = spatial.distance.cdist([node], nodes).argmin()
+    return closest_index
+
+def closest_nodeValue(node, nodes):
+    closest_index = spatial.distance.cdist([node], nodes).argmin()
     return nodes[closest_index]
 
-def nearestVertexForLeds(mesh1, leds)
+def nearestVertexForLeds(mesh1, leds):
     m1 = aims.read(mesh1)
     v = np.array(m1.vertex())
     out = []
