@@ -29,8 +29,8 @@ class LocateLeds(QtGui.QDialog):
         self.ui.loadMeshButton.clicked.connect(self.loadMesh)
         self.ui.deviceCombo.currentIndexChanged.connect(self.updatedDeviceCombo)
         self.ui.saveButton.clicked.connect(self.save)
-        self.ui.nextLedButton.clicked.connect(self.next)
-        self.ui.previousLedButton.clicked.connect(self.previous)
+        self.ui.nextLedButton.clicked.connect(self.nextLed)
+        self.ui.previousLedButton.clicked.connect(self.previousLed)
         self.a = anatomist.Anatomist('-b') #Batch mode (hide Anatomist window)
         self.a.onCursorNotifier.add(self.clickHandler)
         
@@ -51,9 +51,13 @@ class LocateLeds(QtGui.QDialog):
         obj = self.a.loadObject(path)
         pdb.set_trace()
         self.a.addObjects(obj, self.axWindow)
+        self.mesh = obj
         
     def start(self):
         """Light up the first led"""
+        self.coords = [[0,0,0],]
+        self.currentElect = 0
+        self.ui.currentLedLabel.setText("current LED : %i"%self.currentElec)
         self.pb.open()
         self.pb.lightOne(0)
         self.currentElec = 0
@@ -62,7 +66,7 @@ class LocateLeds(QtGui.QDialog):
     def updatedDeviceCombo(self):
         print("no done yet")
     
-    def next(self):
+    def nextLed(self):
         self.currentElec = self.currentElec + 1
         self.ui.currentLedLabel.setText("current LED : %i"%self.currentElec)
         
@@ -72,7 +76,7 @@ class LocateLeds(QtGui.QDialog):
         self.dispCoords(self.coords[self.currentElec])
         self.pb.lightOne(self.currentElec)
     
-    def previous(self):
+    def previousLed(self):
         if self.currentElec == 0:
             return
         self.currentElec = self.currentElec - 1
@@ -86,7 +90,7 @@ class LocateLeds(QtGui.QDialog):
         self.coords[self.currentElec] = coords
         
     def dispCoords(self, coords):
-        self.ui.currentCoordsLabel.setText("Coords: "+repr(coords))
+        self.ui.currentCoordsLabel.setText("Coords: "+ repr(["%.02f"%coords[x] for x in [0,1,2]]))
     
     def save(self):
         path = str(QtGui.QFileDialog.getSaveFileName(self, "Save LED location", "", "LED location (*.leds)"))

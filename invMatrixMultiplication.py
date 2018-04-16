@@ -8,18 +8,24 @@ import numpy as np
 import pdb
 import matplotlib.pyplot as plt
 import math
+import json
 """Example program to show how to read a multi-channel time series from LSL."""
 
 from pylsl import StreamInlet, resolve_stream, resolve_byprop
 
 
 invMat = scipy.io.loadmat('/home/neuropsynov/hugHackathon/MNI_actiCHamp64.mat')
+pathLEDGII = "/home/neuropsynov/mapping_test.leds"
+
+filein = open(pathLEDGII, 'rb')
+matchingLEDGii = json.loads(filein.read())
+filein.close()
 
 
 # first resolve an EEG stream on the lab network
 print("looking for an EEG stream...")
 streams = resolve_byprop('type', 'EEG',timeout=5.0)
-
+pdb.set_trace()
 # create a new inlet to read from the stream
 inlet = StreamInlet(streams[0])
 
