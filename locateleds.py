@@ -7,18 +7,70 @@
 
 import plasticbrain
 import sys
-from soma import aims
+from soma import aims, aimsalgo
 from brainvisa import axon
 
 from brainvisa.configuration import neuroConfig
 neuroConfig.gui = True
 from brainvisa import anatomist
+import anatomist.direct.api as anatomistControl
 import json, time
 import pdb
 import os
+from scipy import spatial
+import numpy as np
 
 from soma.qt_gui.qt_backend import uic, QtGui, QtCore
 from soma.qt_gui.qt_backend.QtCore import QThread
+
+class MyAction( anatomistControl.cpp.Action ):
+    def name( self ):
+      return 'MyAction'
+  
+    def activateVirtualLed( self, x, y, globx, globy ):
+        
+        print 'coucou', x,y
+
+        w = self.view().aWindow()
+        obj = w.objectAtCursorPosition( x, y )
+        if obj is not None:
+          print 'object:', obj, obj.name()
+          poly = w.polygonAtCursorPosition( x, y, obj )
+          mesh = anatomistControl.cpp.AObjectConverter.aims( obj )
+          
+          if poly == 0xffffff or poly < 0 or poly >= len( mesh.polygon() ):
+              return
+          #print 'polygon:', poly
+
+          #print 'mesh:', mesh
+          ppoly = mesh.polygon()[poly]
+          vert = mesh.vertex()
+
+          #print 'poly:', poly, ppoly
+          pos = aims.Point3df()
+          pos = w.positionFromCursor( x, y )
+          #print 'pos:', pos
+          v = ppoly[ np.argmin( [ (vert[p]-pos).norm() for p in ppoly ] ) ]
+          print 'vertex:', v, vert[v]
+          
+          
+
+
+
+class MyControl( anatomistControl.cpp.Control ):
+  def __init__( self, prio = 25 ):
+    anatomistControl.cpp.Control.__init__( self, prio, 'MyControl' )
+    
+  def eventAutoSubscription( self, pool ):
+
+    key = QtCore.Qt
+    NoModifier = key.NoModifier
+    ShiftModifier = key.ShiftModifier
+    ControlModifier = key.ControlModifier
+    AltModifier = key.AltModifier
+  
+    self.mousePressButtonEventSubscribe(key.LeftButton, NoModifier,
+      pool.action( 'MyAction' ).activateVirtualLed )
 
 class LocateLeds(QtGui.QDialog):
     def __init__(self, app = None):
@@ -33,7 +85,15 @@ class LocateLeds(QtGui.QDialog):
         self.ui.previousLedButton.clicked.connect(self.previousLed)
         self.a = anatomist.Anatomist('-b') #Batch mode (hide Anatomist window)
         self.a.onCursorNotifier.add(self.clickHandler)
+        pix = QtGui.QPixmap( 'control.xpm' )
         
+        anatomistControl.cpp.IconDictionary.instance().addIcon( 'MyControl',pix )
+        ad = anatomistControl.cpp.ActionDictionary.instance()
+        ad.addAction( 'MyAction', lambda: MyAction() )
+        cd = anatomistControl.cpp.ControlDictionary.instance()
+        cd.addControl( 'MyControl', lambda: MyControl(), 25 )
+        cm = anatomistControl.cpp.ControlManager.instance()
+        cm.addControl( 'QAGLWidget3D', '', 'MyControl' )
 
         
         self.axWindow = self.a.createWindow( 'Axial' )
@@ -43,15 +103,41 @@ class LocateLeds(QtGui.QDialog):
         layoutAx.addWidget( self.axWindow.getInternalRep() )
         self.currentElec = 0
         self.coords = [[0,0,0],]
+        self.mesh = None
+        self.texture = None
+        self.currentObj = None
+        self.TextObj = None
         
     def loadMesh(self):
         path = str(QtGui.QFileDialog.getOpenFileName(self, "Open Mesh", "", "All meshes(*.gii *.mesh)"))
         if not path:
             return
+        
+        
         obj = self.a.loadObject(path)
-        pdb.set_trace()
-        self.a.addObjects(obj, self.axWindow)
+        #self.a.addObjects(obj, self.axWindow)
         self.mesh = obj
+        texture = aims.TimeTexture('S16')
+        texture2 = aims.TimeTexture('FLOAT')
+        AimsMesh = self.mesh.toAimsObject()
+        #gp = aims.GeodesicPath(AimsMesh, 0, 0)
+        newTextureObj = texture[0]  
+        newTextureObj.reserve(len(AimsMesh.vertex()))
+        newTextureObj2 = texture2[0]  
+        newTextureObj2.reserve(len(AimsMesh.vertex()))        
+        self.texture=texture
+        self.texture2=texture2
+        
+        
+        self.texture2[0].assign([0]*len(AimsMesh.vertex()))
+        if self.TextObj is None:
+          self.TextObj=self.a.toAObject(self.texture2)
+          self.TextObj.setPalette(palette = "RED-ufusion")
+
+          newFusionObj = self.a.fusionObjects([self.mesh, self.TextObj], method='FusionTexSurfMethod')
+        #set palette to Blue-Red-fusion_invert
+          self.a.addObjects(newFusionObj,self.axWindow)
+          self.currentObj=newFusionObj        
         
     def start(self):
         """Light up the first led"""
@@ -85,7 +171,30 @@ class LocateLeds(QtGui.QDialog):
         self.pb.lightOne(self.currentElec)
     
     def clickHandler(self, eventName, params):
-        coords = self.a.linkCursorLastClickedPosition().items()
+        
+        #   pdb.set_trace()
+        coords = params['position'][:3]
+        #coords = self.a.linkCursorLastClickedPosition().items()
+        if self.mesh is not None:
+            #self.updateMeshTexture(coords)
+            
+            win = params['window']
+            pos2d = aims.Point3df()
+            win.view().cursorFromPosition(coords, pos2d)
+            x, y = pos2d[:2]
+            obj = win.objectAtCursorPosition(x, y)
+            MeshObj=[iterobj for iterobj in obj if iterobj==self.mesh]
+            
+            if len(MeshObj)>0: #obj == self.currentObj:
+                
+                mesh = self.a.toAimsObject(self.mesh)
+                poly = win.polygonAtCursorPosition(x, y, self.currentObj)
+                if poly != 0xffffff and poly >= 0 and poly < len(mesh.polygon()):
+                    ppoly = mesh.polygon()[poly]
+                    vert = mesh.vertex()
+                    v = ppoly[np.argmin([(vert[p]-coords).norm() for p in ppoly])]
+                    self.updateMeshTexture(v,mesh)
+                    
         self.dispCoords(coords)
         self.coords[self.currentElec] = coords
         
@@ -120,6 +229,33 @@ class LocateLeds(QtGui.QDialog):
         else:
             self.currentElec = 0
             self.coords = dic['leds']
+            
+    def updateMeshTexture(self,center,AimsMesh):
+        
+
+        self.texture[0].assign([0]*len(AimsMesh.vertex()))
+        self.texture[0][center] = 12
+        self.texture2 = aims.meshdistance.MeshDistance(AimsMesh, self.texture, True)
+        self.texture2[0].arraydata()[np.where(self.texture2[0].arraydata()>=15)]=0
+        #if self.TextObj is None:
+        #  self.TextObj=self.a.toAObject(self.texture2)
+        #  self.TextObj.setPalette(palette = "RED-ufusion")
+
+        #  newFusionObj = self.a.fusionObjects([self.mesh, self.TextObj], method='FusionTexSurfMethod')
+        #set palette to Blue-Red-fusion_invert
+        #  self.a.addObjects(newFusionObj,self.axWindow)
+        #  self.currentObj=newFusionObj
+        #else:
+        self.TextObj.setTexture(self.texture2,True)
+        self.TextObj.notifyObservers()
+        
+        #find all vertex within 2 cm geodesic distance
+        
+        #AimsTextureRegularization c'est quoi ca deja ?
+        #AimsTextureDilation
+        #AimsTextureErosion
+        #VipDistanceMap
+        
      
 def main(noapp=0):
      app = None
