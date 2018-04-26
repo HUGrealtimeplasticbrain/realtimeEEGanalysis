@@ -113,6 +113,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="ReceiveLSLButton">
+       <property name="text">
+        <string>Receive LSL data</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>

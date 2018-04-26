@@ -23,6 +23,10 @@ import numpy as np
 from soma.qt_gui.qt_backend import uic, QtGui, QtCore
 from soma.qt_gui.qt_backend.QtCore import QThread
 
+from pylsl import StreamInlet, resolve_stream, resolve_byprop
+import scipy.io
+import scipy.signal
+
 class MyAction( anatomistControl.cpp.Action ):
     def name( self ):
       return 'MyAction'
@@ -83,6 +87,7 @@ class LocateLeds(QtGui.QDialog):
         self.ui.saveButton.clicked.connect(self.save)
         self.ui.nextLedButton.clicked.connect(self.nextLed)
         self.ui.previousLedButton.clicked.connect(self.previousLed)
+        self.ui.ReceiveLSLButton.clicked.connect(self.ReceiveAndDisplayEEG)
         self.a = anatomist.Anatomist('-b') #Batch mode (hide Anatomist window)
         self.a.onCursorNotifier.add(self.clickHandler)
         pix = QtGui.QPixmap( 'control.xpm' )
@@ -256,6 +261,37 @@ class LocateLeds(QtGui.QDialog):
         #AimsTextureErosion
         #VipDistanceMap
         
+    def ReceiveAndDisplayEEG(self):
+        
+        if self.currentObj is None:
+            print("no mesh")
+            return
+        try:
+            invMat = scipy.io.loadmat('/home/neuropsynov/hugHackathon/MNI_actiCHamp64.mat')
+        except:
+            print("can't open the inv mat")
+            return
+        print("looking for an EEG stream...")
+        streams = resolve_byprop('type', 'EEG',timeout=5.0)
+        if len(streams)==0:
+            print("no eeg signal found")
+            return
+        
+        #check number of contact match invMat size
+        if streams[0].channel_count() != invMat["x"].shape[1]:
+            print("invMat and channel_count doesn't match")
+        
+        sefl.EEGAnalysisParam = {}
+        nyq=0.5*streams[0].nominal_srate()
+        low = 1 / nyq
+        high = 81 / nyq
+        paramFil = scipy.signal.butter(6, [low, high], btype='band')
+        
+    
+        while True:
+            print("coucou")
+        
+        pdb.set_trace()
      
 def main(noapp=0):
      app = None

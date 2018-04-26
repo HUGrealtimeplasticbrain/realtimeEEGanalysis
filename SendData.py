@@ -25,7 +25,7 @@ samplingRate = 500
 #number of channel
 chanNum = 64
 
-info = StreamInfo('BioSemi', 'EEG', chanNum, samplingRate, 'float32', 'myuid34234')
+info = StreamInfo('SimulatedSignal', 'EEG', chanNum, samplingRate, 'float32', 'myuid34234')
 # next make an outlet
 outlet = StreamOutlet(info)
 
