@@ -26,6 +26,7 @@ from soma.qt_gui.qt_backend.QtCore import QThread
 from pylsl import StreamInlet, resolve_stream, resolve_byprop
 import scipy.io
 import scipy.signal
+import math
 
 class MyAction( anatomistControl.cpp.Action ):
     def name( self ):
@@ -109,6 +110,7 @@ class LocateLeds(QtGui.QDialog):
         self.currentElec = 0
         self.coords = [[0,0,0],]
         self.mesh = None
+        self.aimsMesh = None
         self.texture = None
         self.currentObj = None
         self.TextObj = None
@@ -122,6 +124,7 @@ class LocateLeds(QtGui.QDialog):
         obj = self.a.loadObject(path)
         #self.a.addObjects(obj, self.axWindow)
         self.mesh = obj
+        self.aimsMesh = None
         texture = aims.TimeTexture('S16')
         texture2 = aims.TimeTexture('FLOAT')
         AimsMesh = self.mesh.toAimsObject()
@@ -192,13 +195,15 @@ class LocateLeds(QtGui.QDialog):
             
             if len(MeshObj)>0: #obj == self.currentObj:
                 
-                mesh = self.a.toAimsObject(self.mesh)
+                if self.aimsMesh is None:
+                    self.aimsMesh = self.a.toAimsObject(self.mesh)
+
                 poly = win.polygonAtCursorPosition(x, y, self.currentObj)
                 if poly != 0xffffff and poly >= 0 and poly < len(mesh.polygon()):
                     ppoly = mesh.polygon()[poly]
                     vert = mesh.vertex()
                     v = ppoly[np.argmin([(vert[p]-coords).norm() for p in ppoly])]
-                    self.updateMeshTexture(v,mesh)
+                    self.updateMeshTexture(v,self.aimsMesh)
                     
         self.dispCoords(coords)
         self.coords[self.currentElec] = coords
@@ -261,7 +266,7 @@ class LocateLeds(QtGui.QDialog):
         #AimsTextureErosion
         #VipDistanceMap
         
-    def ReceiveAndDisplayEEG(self):
+    def ReceiveAndDisplayEEG(self,lowfreq=1,highfreq=81,band=[10,20]):
         
         if self.currentObj is None:
             print("no mesh")
@@ -271,6 +276,13 @@ class LocateLeds(QtGui.QDialog):
         except:
             print("can't open the inv mat")
             return
+        
+        try:
+            spi2gii = np.load('/home/neuropsynov/hugHackathon/spi2fullGii.npy')
+        except:
+            print("can't open the spi2gii file")
+            return
+        
         print("looking for an EEG stream...")
         streams = resolve_byprop('type', 'EEG',timeout=5.0)
         if len(streams)==0:
@@ -281,15 +293,56 @@ class LocateLeds(QtGui.QDialog):
         if streams[0].channel_count() != invMat["x"].shape[1]:
             print("invMat and channel_count doesn't match")
         
-        sefl.EEGAnalysisParam = {}
+        #check if we have EOG for eye artefact removal
+        
+        
+        #prepare the texture object
+        if self.aimsMesh is None:
+            self.aimsMesh = self.a.toAimsObject(self.mesh)
+        
+        self.texture[0].assign([0]*len(self.aimsMesh.vertex()))
+        
+        currentIndex=0
+        buffSize=500
+        buff = np.zeros([buffSize, streams[0].channel_count()])
+        
+        #est-ce qu'on fait un buffer "normalisation" avec le signal en degageant du signal tout ce qui est >5 la MAD ?
+        
+        self.EEGAnalysisParam = {}
         nyq=0.5*streams[0].nominal_srate()
-        low = 1 / nyq
-        high = 81 / nyq
+        low = lowfreq / nyq
+        high = highfreq / nyq
         paramFil = scipy.signal.butter(6, [low, high], btype='band')
         
+        # create a new inlet to read from the stream
+        inlet = StreamInlet(streams[0])
+        mustStop = False
     
-        while True:
-            print("coucou")
+        while not mustStop:
+            print(currentIndex)
+            np.roll(buff, -1, 0)
+            buff[buffSize - 1, :], timestamp = inlet.pull_sample()
+            
+            if currentIndex>=500:
+                filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],buff,method="gust",axis=0)
+            
+                #il faudrait faire une fastICA ici
+            
+                #on prend juste le milieu du signal ?
+                f_welch, S_xx_welch=scipy.signal.welch(filtSample[math.floor(buffSize/4):math.floor(buffSize/4)*3,:],fs=streams[0].nominal_srate(),nfft=math.floor(2*streams[0].nominal_srate()/2.5),nperseg=math.floor(streams[0].nominal_srate()/5.0),axis=0,scaling="density")
+                
+                freqKept=(f_welch >= band[0]) & (f_welch <= band[1])
+            
+                
+                DataToProject= np.mean(S_xx_welch[freqKept,:],axis=0)
+                invsolmat = np.sqrt(np.multiply(np.dot(invMat["x"],DataToProject),np.dot(invMat["x"],DataToProject)) + np.multiply(np.dot(invMat["y"],DataToProject),np.dot(invMat["y"],DataToProject)) + np.multiply(np.dot(invMat["z"],DataToProject),np.dot(invMat["z"],DataToProject)))
+                #if currentIndex % 500 == 0:
+                #   plt.plot(filtSample[:,5], 'b-')
+                #   plt.plot(buff[:,5], 'r-')
+                #   plt.show()
+                pdb.set_trace()
+            
+            currentIndex += 1
         
         pdb.set_trace()
      
