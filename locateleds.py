@@ -89,6 +89,7 @@ class LocateLeds(QtGui.QDialog):
         self.ui.nextLedButton.clicked.connect(self.nextLed)
         self.ui.previousLedButton.clicked.connect(self.previousLed)
         self.ui.ReceiveLSLButton.clicked.connect(self.ReceiveAndDisplayEEG)
+        self.ui.StopReceiveData.clicked.connect(self.StopReceiveData)
         self.a = anatomist.Anatomist('-b') #Batch mode (hide Anatomist window)
         self.a.onCursorNotifier.add(self.clickHandler)
         pix = QtGui.QPixmap( 'control.xpm' )
@@ -272,6 +273,10 @@ class LocateLeds(QtGui.QDialog):
         #AimsTextureErosion
         #VipDistanceMap
         
+    def StopReceiveData(self):
+        
+        self.mustStop = True
+    
     def ReceiveAndDisplayEEG(self,lowfreq=1,highfreq=81,band=[10,20]):
         
         if self.currentObj is None:
@@ -322,10 +327,10 @@ class LocateLeds(QtGui.QDialog):
         
         # create a new inlet to read from the stream
         inlet = StreamInlet(streams[0])
-        mustStop = False
+        self.mustStop = False
         self.TextObj.setPalette(palette = 'Blue-Red')
     
-        while not mustStop:
+        while not self.mustStop:
             print(currentIndex)
             np.roll(buff, -1, 0)
             buff[buffSize - 1, :], timestamp = inlet.pull_sample()
