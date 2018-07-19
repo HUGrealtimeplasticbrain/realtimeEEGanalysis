@@ -92,7 +92,7 @@ class LocateLeds(QtGui.QDialog):
         self.a = anatomist.Anatomist('-b') #Batch mode (hide Anatomist window)
         self.a.onCursorNotifier.add(self.clickHandler)
         pix = QtGui.QPixmap( 'control.xpm' )
-        
+        self.app =app
         anatomistControl.cpp.IconDictionary.instance().addIcon( 'MyControl',pix )
         ad = anatomistControl.cpp.ActionDictionary.instance()
         ad.addAction( 'MyAction', lambda: MyAction() )
@@ -150,6 +150,7 @@ class LocateLeds(QtGui.QDialog):
     def start(self):
         """Light up the first led"""
         self.coords = [[0,0,0],]
+        self.VertexLed = []
         self.currentElect = 0
         self.ui.currentLedLabel.setText("current LED : %i"%self.currentElec)
         self.pb.open()
@@ -199,14 +200,19 @@ class LocateLeds(QtGui.QDialog):
                     self.aimsMesh = self.a.toAimsObject(self.mesh)
 
                 poly = win.polygonAtCursorPosition(x, y, self.currentObj)
-                if poly != 0xffffff and poly >= 0 and poly < len(mesh.polygon()):
-                    ppoly = mesh.polygon()[poly]
-                    vert = mesh.vertex()
+                if poly != 0xffffff and poly >= 0 and poly < len(self.aimsMesh.polygon()):
+                    ppoly = self.aimsMesh.polygon()[poly]
+                    vert = self.aimsMesh.vertex()
                     v = ppoly[np.argmin([(vert[p]-coords).norm() for p in ppoly])]
                     self.updateMeshTexture(v,self.aimsMesh)
                     
         self.dispCoords(coords)
         self.coords[self.currentElec] = coords
+#j'en suis la
+        intermediaire = self.texture2[0].arraydata()
+        intermediaire[np.where(intermediaire>=15)]=0
+        self.VertexLed.append()
+        
         
     def dispCoords(self, coords):
         self.ui.currentCoordsLabel.setText("Coords: "+ repr(["%.02f"%coords[x] for x in [0,1,2]]))
@@ -272,7 +278,7 @@ class LocateLeds(QtGui.QDialog):
             print("no mesh")
             return
         try:
-            invMat = scipy.io.loadmat('/home/neuropsynov/hugHackathon/MNI_actiCHamp64.mat')
+            invMat = scipy.io.loadmat('/home/neuropsynov/hugHackathon/Manik_actiCHamp64_5000.mat')
         except:
             print("can't open the inv mat")
             return
@@ -317,6 +323,7 @@ class LocateLeds(QtGui.QDialog):
         # create a new inlet to read from the stream
         inlet = StreamInlet(streams[0])
         mustStop = False
+        self.TextObj.setPalette(palette = 'Blue-Red')
     
         while not mustStop:
             print(currentIndex)
@@ -325,9 +332,9 @@ class LocateLeds(QtGui.QDialog):
             
             if currentIndex>=500:
                 filtSample = scipy.signal.filtfilt(paramFil[0],paramFil[1],buff,method="gust",axis=0)
-            
                 #il faudrait faire une fastICA ici
             
+                
                 #on prend juste le milieu du signal ?
                 f_welch, S_xx_welch=scipy.signal.welch(filtSample[math.floor(buffSize/4):math.floor(buffSize/4)*3,:],fs=streams[0].nominal_srate(),nfft=math.floor(2*streams[0].nominal_srate()/2.5),nperseg=math.floor(streams[0].nominal_srate()/5.0),axis=0,scaling="density")
                 
@@ -335,12 +342,21 @@ class LocateLeds(QtGui.QDialog):
             
                 
                 DataToProject= np.mean(S_xx_welch[freqKept,:],axis=0)
+                #DataToProject = buff[250,:]
                 invsolmat = np.sqrt(np.multiply(np.dot(invMat["x"],DataToProject),np.dot(invMat["x"],DataToProject)) + np.multiply(np.dot(invMat["y"],DataToProject),np.dot(invMat["y"],DataToProject)) + np.multiply(np.dot(invMat["z"],DataToProject),np.dot(invMat["z"],DataToProject)))
                 #if currentIndex % 500 == 0:
                 #   plt.plot(filtSample[:,5], 'b-')
                 #   plt.plot(buff[:,5], 'r-')
                 #   plt.show()
-                pdb.set_trace()
+                fullTexture = np.dot(spi2gii,invsolmat)
+                self.texture2[0].assign(fullTexture)
+                self.TextObj.setTexture(self.texture2,True)
+                self.TextObj.notifyObservers()
+                self.app.processEvents()
+                
+                
+                #mapping avec les leds
+                
             
             currentIndex += 1
         

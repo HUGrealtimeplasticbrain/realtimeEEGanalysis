@@ -37,11 +37,11 @@ t=0
 while True:
     # make a new random 8-channel sample; this is converted into a
     # pylsl.vectorf (the data type that is expected by push_sample)
-    mysample = [np.random.normal(0,0.4) for i in range(64)]
+    mysample = [np.random.normal(0,0.1) for i in range(64)]
     
     for i in signalFort:
         for ifreq in freq:
-           mysample[i]=mysample[i]+np.sin(2*np.pi*t*ifreq/samplingRate)
+           mysample[i]=mysample[i]+2*np.sin(2*np.pi*t*ifreq/samplingRate)
     for i in signalFaible:
         for ifreq in freq:
            mysample[i]=mysample[i]+np.sin(2*np.pi*t*ifreq/samplingRate) 
